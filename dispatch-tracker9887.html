@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVISION Dispatch Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --navy:#0b1f3a;
+    --navy-dark:#071427;
+    --red:#e3342f;
+    --red-dark:#b8261f;
+    --bg:#f4f6fa;
+    --card:#ffffff;
+    --text:#1c2733;
+    --muted:#6b7686;
+    --border:#e1e6ee;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy-dark));
+    color:#fff;
+    padding:16px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.5px;}
+  header h1 span{color:var(--red);}
+  header .userbox{display:flex;align-items:center;gap:12px;font-size:14px;}
+  header .userbox .role-badge{
+    background:var(--red);
+    padding:3px 10px;
+    border-radius:20px;
+    font-size:11px;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  header button{
+    background:transparent;
+    border:1px solid rgba(255,255,255,.4);
+    color:#fff;
+    padding:6px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  header button:hover{background:rgba(255,255,255,.15);}
+
+  .container{max-width:1200px;margin:0 auto;padding:20px;}
+
+  /* Auth screens */
+  .auth-wrap{
+    min-height:90vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .auth-card{
+    background:var(--card);
+    border-radius:14px;
+    padding:36px;
+    width:100%;
+    max-width:400px;
+    box-shadow:0 10px 40px rgba(11,31,58,.12);
+  }
+  .auth-card h2{margin-top:0;color:var(--navy);}
+  .auth-card p.sub{color:var(--muted);font-size:14px;margin-top:-8px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:var(--navy);}
+  .field input, .field select, .field textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:14px;
+    background:#fafbfc;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none;border-color:var(--navy);background:#fff;
+  }
+  .btn{
+    display:inline-block;
+    background:var(--red);
+    color:#fff;
+    border:none;
+    padding:10px 20px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .btn:hover{background:var(--red-dark);}
+  .btn.secondary{background:var(--navy);}
+  .btn.secondary:hover{background:var(--navy-dark);}
+  .btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--border);}
+  .btn.block{width:100%;}
+  .btn.small{padding:6px 12px;font-size:12px;}
+  .switch-link{
+    text-align:center;margin-top:14px;font-size:13px;color:var(--muted);
+  }
+  .switch-link a{color:var(--red);cursor:pointer;font-weight:600;text-decoration:none;}
+  .msg{
+    padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px;
+  }
+  .msg.error{background:#fdecea;color:var(--red-dark);}
+  .msg.info{background:#e8f0fe;color:#1a3a6b;}
+  .msg.success{background:#e6f7ed;color:#146c3a;}
+
+  /* Pending approval */
+  .pending-box{
+    background:#fff9e6;border:1px solid #ffe08a;color:#8a6d00;
+    padding:16px;border-radius:10px;text-align:center;font-size:14px;
+  }
+
+  /* Tabs / toolbar */
+  .toolbar{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:16px;flex-wrap:wrap;gap:10px;
+  }
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .tab-btn{
+    padding:8px 16px;border-radius:8px;border:1px solid var(--border);
+    background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);
+  }
+  .tab-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+  .stats-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+  .stat-card{
+    background:var(--card);border-radius:10px;padding:14px 18px;flex:1;min-width:130px;
+    border-left:4px solid var(--navy);box-shadow:0 2px 8px rgba(11,31,58,.06);
+  }
+  .stat-card .num{font-size:22px;font-weight:700;color:var(--navy);}
+  .stat-card .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;}
+  .stat-card.red{border-left-color:var(--red);}
+  .stat-card.red .num{color:var(--red);}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(11,31,58,.06);}
+  th,td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);}
+  th{background:var(--navy);color:#fff;font-weight:600;font-size:12px;text-transform:uppercase;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#f8faff;}
+  .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;display:inline-block;}
+  .badge.dispatched{background:#e8f0fe;color:#1a3a6b;}
+  .badge.in_repair{background:#fff4e0;color:#9a6400;}
+  .badge.received{background:#e6f7ed;color:#146c3a;}
+  .badge.delivered{background:#e6f7ed;color:#146c3a;}
+  .badge.closed{background:#eee;color:#666;}
+  .badge.received_from_customer{background:#e8f0fe;color:#1a3a6b;}
+  .badge.sent_to_vendor{background:#fff4e0;color:#9a6400;}
+  .badge.received_from_vendor{background:#f0e6fb;color:#5a2d91;}
+  .badge.returned_to_customer{background:#e6f7ed;color:#146c3a;}
+  .type-tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;}
+  .type-tag.repair_out{background:#ffe9e8;color:var(--red-dark);}
+  .type-tag.delivery{background:#e8f0fe;color:#1a3a6b;}
+  .type-tag.stock_in{background:#e6f7ed;color:#146c3a;}
+  .type-tag.customer_repair{background:#f0e6fb;color:#5a2d91;}
+  .badge.added{background:#e6f7ed;color:#146c3a;}
+  .summary-table td.num{text-align:right;font-weight:700;}
+  .summary-table td.net-pos{color:#146c3a;}
+  .summary-table td.net-neg{color:var(--red-dark);}
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+
+  /* Modal */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(11,31,58,.5);
+    align-items:center;justify-content:center;z-index:100;padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:#fff;border-radius:14px;padding:28px;max-width:520px;width:100%;
+    max-height:90vh;overflow-y:auto;
+  }
+  .modal h3{margin-top:0;color:var(--navy);}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+  .type-selector{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .type-selector label{
+    flex:1;min-width:110px;border:2px solid var(--border);border-radius:8px;padding:12px;text-align:center;
+    cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);
+  }
+  .type-selector input{display:none;}
+  .type-selector input:checked + span{color:var(--navy);}
+  .type-selector label.checked{border-color:var(--red);background:#fff5f5;}
+
+  .action-links{display:flex;gap:8px;flex-wrap:wrap;}
+  .action-links a{font-size:12px;color:var(--navy);cursor:pointer;font-weight:600;text-decoration:underline;}
+
+  .approval-list{display:flex;flex-direction:column;gap:10px;}
+  .approval-item{
+    background:var(--card);border-radius:10px;padding:14px 16px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+    box-shadow:0 2px 8px rgba(11,31,58,.06);
+  }
+  .approval-item .who{font-size:14px;font-weight:600;color:var(--navy);}
+  .approval-item .who small{display:block;font-weight:400;color:var(--muted);font-size:12px;}
+  .approval-item .actions{display:flex;gap:8px;align-items:center;}
+  select.role-select{padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;}
+
+  @media (max-width:640px){
+    table, thead, tbody, th, td, tr{display:block;}
+    thead{display:none;}
+    tr{margin-bottom:12px;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(11,31,58,.06);padding:8px;}
+    td{border:none;padding:6px 10px;display:flex;justify-content:space-between;font-size:13px;}
+    td::before{content:attr(data-label);font-weight:700;color:var(--muted);margin-right:10px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="authScreen" class="auth-wrap">
+  <div class="auth-card">
+    <div id="loginForm">
+      <h2>EVISION <span style="color:var(--red)">Dispatch</span> Tracker</h2>
+      <p class="sub">Login to continue</p>
+      <div id="loginMsg"></div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@evisionindia.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <button class="btn block" onclick="handleLogin()">Login</button>
+      <div class="switch-link" style="color:var(--muted);">Naya account admin banayega — Supabase mein.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PENDING APPROVAL SCREEN ============ -->
+<div id="pendingScreen" class="auth-wrap" style="display:none;">
+  <div class="auth-card" style="text-align:center;">
+    <h2>Almost there!</h2>
+    <div class="pending-box">
+      Your account is created but waiting for admin approval.<br>
+      Please check back later or contact the admin.
+    </div>
+    <button class="btn ghost block" style="margin-top:18px;" onclick="handleLogout()">Logout</button>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="mainApp" style="display:none;">
+  <header>
+    <h1>EVISION <span>Dispatch</span> Tracker</h1>
+    <div class="userbox">
+      <span id="userNameDisplay"></span>
+      <span class="role-badge" id="roleBadge"></span>
+      <button onclick="handleLogout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All</button>
+        <button class="tab-btn" data-tab="stock_in" onclick="switchTab('stock_in')">Stock In</button>
+        <button class="tab-btn" data-tab="repair_out" onclick="switchTab('repair_out')">Repair Out</button>
+        <button class="tab-btn" data-tab="customer_repair" onclick="switchTab('customer_repair')">Customer Repair</button>
+        <button class="tab-btn" data-tab="delivery" onclick="switchTab('delivery')">Delivery</button>
+        <button class="tab-btn" data-tab="pending_return" onclick="switchTab('pending_return')">Pending Return</button>
+        <button class="tab-btn" data-tab="summary" onclick="switchTab('summary')">Stock Summary</button>
+        <span id="adminTabWrap"></span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="🔍 Item, customer, ya vendor se search karo..." style="flex:1;max-width:340px;padding:9px 14px;border:1px solid var(--border);border-radius:8px;font-size:13px;" oninput="renderTable()">
+      <div style="display:flex;gap:8px;">
+        <div style="position:relative;">
+          <button class="btn secondary" onclick="toggleExportMenu()">⬇ Export</button>
+          <div id="exportMenu" style="display:none;position:absolute;right:0;top:110%;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(11,31,58,.15);z-index:20;min-width:160px;overflow:hidden;">
+            <a onclick="exportExcel()" style="display:block;padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer;text-decoration:none;">📊 Export Excel</a>
+            <a onclick="exportPDF()" style="display:block;padding:10px 14px;font-size:13px;color:var(--text);cursor:pointer;text-decoration:none;border-top:1px solid var(--border);">📄 Export PDF</a>
+          </div>
+        </div>
+        <button class="btn" onclick="openAddModal()">+ New Dispatch</button>
+      </div>
+    </div>
+
+    <div id="tableWrap"></div>
+    <div id="summaryWrap" style="display:none;"></div>
+    <div id="approvalWrap" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ============ ADD/EDIT MODAL ============ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">New Dispatch</h3>
+    <div id="modalMsg"></div>
+
+    <div class="type-selector" id="typeSelector">
+      <label id="lblStockIn"><input type="radio" name="dtype" value="stock_in" onchange="onTypeChange()"><span>📥 Stock In</span></label>
+      <label id="lblRepair"><input type="radio" name="dtype" value="repair_out" onchange="onTypeChange()"><span>🔧 Repair Out</span></label>
+      <label id="lblCustRepair"><input type="radio" name="dtype" value="customer_repair" onchange="onTypeChange()"><span>👤 Customer Repair</span></label>
+      <label id="lblDelivery"><input type="radio" name="dtype" value="delivery" onchange="onTypeChange()"><span>📦 Delivery</span></label>
+    </div>
+
+    <div class="field"><label>Item / Product Name</label><input type="text" id="f_item_name" placeholder="e.g. 4CH DVR, Speed Dome Camera, CAT6 Cable"></div>
+    <div style="display:flex;gap:10px;">
+      <div class="field" style="flex:2;"><label>Quantity</label><input type="number" id="f_quantity" value="1" min="0" step="any"></div>
+      <div class="field" style="flex:1;"><label>Unit</label>
+        <select id="f_unit">
+          <option value="pcs">Pieces</option>
+          <option value="meter">Meter</option>
+          <option value="roll">Roll</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- stock in fields -->
+    <div id="stockInFields" style="display:none;">
+      <div class="field"><label>Supplier / Source</label><input type="text" id="f_source" placeholder="e.g. Company warehouse, Distributor name"></div>
+    </div>
+
+    <!-- repair fields -->
+    <div id="repairFields" style="display:none;">
+      <div class="field"><label>Sent To (Vendor / Service Center)</label><input type="text" id="f_sent_to" placeholder="e.g. XYZ Repair Center"></div>
+      <div class="field"><label>Expected Return Date</label><input type="date" id="f_expected_return"></div>
+      <div class="field"><label>Received Date (jab wapas aaya)</label><input type="date" id="f_received_date"></div>
+    </div>
+
+    <!-- customer repair (2-hop) fields -->
+    <div id="custRepairFields" style="display:none;">
+      <div class="field"><label>Customer Name</label><input type="text" id="cr_customer_name" placeholder="e.g. Sharma Electronics, Vaishali"></div>
+      <div class="field"><label>Received from Customer Date</label><input type="date" id="cr_received_from_customer"></div>
+      <div class="field"><label>Vendor / 3rd Party Name</label><input type="text" id="cr_vendor_name" placeholder="e.g. XYZ Repair Center" oninput="renderWhatsappReminder()"></div>
+      <div class="field"><label>Vendor WhatsApp Number (optional)</label><input type="text" id="cr_vendor_phone" placeholder="e.g. 91987XXXXXXX" oninput="renderWhatsappReminder()"></div>
+      <div class="field"><label>Sent to Vendor Date</label><input type="date" id="cr_sent_to_vendor"></div>
+      <div class="field"><label>Received from Vendor Date</label><input type="date" id="cr_received_from_vendor"></div>
+      <div class="field"><label>Returned to Customer Date</label><input type="date" id="cr_returned_to_customer"></div>
+    </div>
+
+    <!-- delivery fields -->
+    <div id="deliveryFields" style="display:none;">
+      <div class="field"><label>Customer Name</label><input type="text" id="f_customer_name" placeholder="e.g. Sharma Electronics, Vaishali"></div>
+      <div class="field"><label>Address / Location</label><input type="text" id="f_address" placeholder="e.g. Kaushambi, Ghaziabad"></div>
+    </div>
+
+    <div class="field" id="genericDateField"><label>Dispatch Date</label><input type="date" id="f_dispatch_date"></div>
+    <div class="field">
+      <label>Status</label>
+      <select id="f_status"></select>
+    </div>
+    <div class="field"><label>Remarks</label><textarea id="f_remarks" rows="2" placeholder="Optional notes"></textarea></div>
+    <div id="whatsappReminderWrap"></div>
+
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="saveBtn" onclick="saveRecord()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SUPABASE CONFIG — REPLACE THESE TWO VALUES
+   Get them from your Supabase Project -> Settings -> API
+   ============================================================ */
+const SUPABASE_URL = 'https://hzlliaqpcteatcnnwwly.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6bGxpYXFwY3RlYXRjbm53d2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3Mjk5MDIsImV4cCI6MjA4OTMwNTkwMn0.raTpu51lm74uVrwQLkMIrOdL-Mo-PqRagUzbDQJmb5g';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let currentProfile = null;
+let allProfiles = {};
+let records = [];
+let activeTab = 'all';
+let editingId = null;
+let lowStockThreshold = 5;
+
+function showMsg(elId, text, type='error'){
+  const el = document.getElementById(elId);
+  el.innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+// ---------- LOGIN ----------
+async function handleLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if(!email || !password){ showMsg('loginMsg','Please enter email and password.'); return; }
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ showMsg('loginMsg', error.message); return; }
+  await afterLogin();
+}
+
+async function handleLogout(){
+  await sb.auth.signOut();
+  currentUser = null; currentProfile = null;
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('pendingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+}
+
+// ---------- SESSION BOOTSTRAP ----------
+async function afterLogin(){
+  const { data: { user } } = await sb.auth.getUser();
+  if(!user){ return; }
+  currentUser = user;
+
+  let { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+
+  // Admin creates the login directly in Supabase (Authentication -> Users),
+  // so on first login we just auto-create their profile row (approved by default).
+  if(!profile){
+    const { data: created } = await sb.from('profiles')
+      .insert({ id: user.id, email: user.email, full_name: user.email.split('@')[0], role: 'staff', approved: true })
+      .select().single();
+    profile = created;
+  }
+  currentProfile = profile;
+
+  if(!profile || !profile.approved){
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('pendingScreen').style.display = 'flex';
+    return;
+  }
+
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('pendingScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userNameDisplay').innerText = profile.full_name || profile.email;
+  document.getElementById('roleBadge').innerText = profile.role;
+
+  if(profile.role === 'admin'){
+    document.getElementById('adminTabWrap').innerHTML =
+      `<button class="tab-btn" data-tab="team" onclick="switchTab('team')">Team</button>`;
+  }
+
+  await loadProfiles();
+  await loadSettings();
+  await loadRecords();
+}
+
+async function loadSettings(){
+  try{
+    const { data } = await sb.from('app_settings').select('*').eq('key','low_stock_threshold').single();
+    if(data && data.value) lowStockThreshold = parseFloat(data.value) || 5;
+  }catch(e){ /* table may not exist yet until migration is run */ }
+}
+
+async function loadProfiles(){
+  const { data } = await sb.from('profiles').select('*');
+  allProfiles = {};
+  (data || []).forEach(p => allProfiles[p.id] = p);
+}
+
+// ---------- LOAD RECORDS ----------
+async function loadRecords(){
+  const { data, error } = await sb.from('dispatch_records').select('*').order('created_at', { ascending:false });
+  if(error){ console.error(error); return; }
+  records = data || [];
+  renderStats();
+  renderTable();
+}
+
+function itemStockMap(){
+  const byItem = {};
+  records.forEach(r=>{
+    const unit = r.unit || 'pcs';
+    const key = `${r.item_name || '(unnamed)'}|||${unit}`;
+    if(!byItem[key]) byItem[key] = { in:0, out:0, itemName: r.item_name || '(unnamed)', unit };
+    const qty = Number(r.quantity||0);
+    if(r.dispatch_type === 'stock_in') byItem[key].in += qty;
+    if(r.dispatch_type === 'repair_out' && r.status === 'received') byItem[key].in += qty;
+    if(r.dispatch_type === 'delivery') byItem[key].out += qty;
+    if(r.dispatch_type === 'repair_out') byItem[key].out += qty;
+  });
+  return byItem;
+}
+
+function unitLabel(u){
+  return ({pcs:'pcs', meter:'m', roll:'roll'})[u] || u;
+}
+
+function renderStats(){
+  const stockIn = records.filter(r=>r.dispatch_type==='stock_in').reduce((s,r)=>s+Number(r.quantity||0),0)
+                + records.filter(r=>r.dispatch_type==='repair_out' && r.status==='received').reduce((s,r)=>s+Number(r.quantity||0),0);
+  const stockOut = records.filter(r=>r.dispatch_type==='delivery').reduce((s,r)=>s+Number(r.quantity||0),0)
+                 + records.filter(r=>r.dispatch_type==='repair_out').reduce((s,r)=>s+Number(r.quantity||0),0);
+  const netStock = stockIn - stockOut;
+  const pendingReturn = records.filter(r=>r.dispatch_type==='repair_out' && !['received','closed'].includes(r.status)).length;
+
+  const byItem = itemStockMap();
+  const lowStockCount = Object.values(byItem).filter(v => (v.in - v.out) < lowStockThreshold).length;
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="num">${stockIn}</div><div class="lbl">Total Stock In</div></div>
+    <div class="stat-card red"><div class="num">${stockOut}</div><div class="lbl">Total Stock Out</div></div>
+    <div class="stat-card" style="border-left-color:${netStock>=0?'#146c3a':'var(--red)'}"><div class="num" style="color:${netStock>=0?'#146c3a':'var(--red)'}">${netStock}</div><div class="lbl">Net Stock (In − Out)</div></div>
+    <div class="stat-card red"><div class="num">${pendingReturn}</div><div class="lbl">Pending Return</div></div>
+    <div class="stat-card red"><div class="num">${lowStockCount}</div><div class="lbl">Low Stock Items</div></div>
+  `;
+}
+
+// ---------- TABS ----------
+function switchTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+
+  document.getElementById('tableWrap').style.display = 'none';
+  document.getElementById('summaryWrap').style.display = 'none';
+  document.getElementById('approvalWrap').style.display = 'none';
+
+  if(tab === 'team'){
+    document.getElementById('approvalWrap').style.display = 'block';
+    renderApprovals();
+  } else if(tab === 'summary'){
+    document.getElementById('summaryWrap').style.display = 'block';
+    renderSummary();
+  } else {
+    document.getElementById('tableWrap').style.display = 'block';
+    renderTable();
+  }
+}
+
+function renderSummary(){
+  const byItem = itemStockMap();
+  const keys = Object.keys(byItem).sort((a,b)=> byItem[a].itemName.localeCompare(byItem[b].itemName));
+
+  const thresholdControl = currentProfile.role === 'admin' ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <label style="font-size:13px;font-weight:600;color:var(--navy);">Low Stock Threshold:</label>
+      <input type="number" id="thresholdInput" value="${lowStockThreshold}" min="0" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;">
+      <button class="btn small" onclick="saveThreshold()">Save</button>
+    </div>` : `<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Low stock threshold: ${lowStockThreshold}</div>`;
+
+  if(keys.length === 0){
+    document.getElementById('summaryWrap').innerHTML = thresholdControl + `<div class="empty-state">Koi record nahi hai abhi.</div>`;
+    return;
+  }
+
+  const rows = keys.map(key => {
+    const { in: qIn, out: qOut, itemName, unit } = byItem[key];
+    const net = qIn - qOut;
+    const isLow = net < lowStockThreshold;
+    const u = unitLabel(unit);
+    return `
+      <tr ${isLow ? 'style="background:#fff5f5;"' : ''}>
+        <td data-label="Item">${itemName} <small style="color:var(--muted)">(${u})</small> ${isLow ? '<span class="badge closed" style="background:#ffe0e0;color:var(--red-dark);">LOW STOCK</span>' : ''}</td>
+        <td data-label="Stock In" class="num">${qIn} ${u}</td>
+        <td data-label="Stock Out" class="num">${qOut} ${u}</td>
+        <td data-label="Net Stock" class="num ${net>=0?'net-pos':'net-neg'}">${net} ${u}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('summaryWrap').innerHTML = thresholdControl + `
+    <table class="summary-table">
+      <thead><tr><th>Item</th><th>Stock In</th><th>Stock Out</th><th>Net Stock</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function saveThreshold(){
+  const val = parseFloat(document.getElementById('thresholdInput').value) || 0;
+  lowStockThreshold = val;
+  await sb.from('app_settings').upsert({ key: 'low_stock_threshold', value: String(val) });
+  renderStats();
+  renderSummary();
+}
+
+function renderApprovals(){
+  const list = Object.values(allProfiles).sort((a,b)=> (a.full_name||a.email).localeCompare(b.full_name||b.email));
+  if(list.length === 0){
+    document.getElementById('approvalWrap').innerHTML = `<div class="empty-state">No team members yet. Add a login for them in Supabase (Authentication → Users) — they'll show up here after their first login.</div>`;
+    return;
+  }
+  document.getElementById('approvalWrap').innerHTML = `<div class="approval-list">` +
+    list.map(p => `
+      <div class="approval-item">
+        <div class="who">${p.full_name || '(no name)'}<small>${p.email}</small></div>
+        <div class="actions">
+          <select class="role-select" onchange="changeRole('${p.id}', this.value)">
+            <option value="staff" ${p.role==='staff'?'selected':''}>Staff</option>
+            <option value="admin" ${p.role==='admin'?'selected':''}>Admin</option>
+          </select>
+          ${p.approved
+            ? `<button class="btn small ghost" onclick="setApproval('${p.id}', false)">Deactivate</button>`
+            : `<button class="btn small" onclick="setApproval('${p.id}', true)">Reactivate</button>`}
+        </div>
+      </div>
+    `).join('') + `</div>`;
+}
+
+async function setApproval(id, approved){
+  await sb.from('profiles').update({ approved }).eq('id', id);
+  await loadProfiles();
+  renderApprovals();
+}
+async function changeRole(id, role){
+  await sb.from('profiles').update({ role }).eq('id', id);
+  await loadProfiles();
+  renderApprovals();
+}
+
+// ---------- TABLE RENDER ----------
+function filteredRecords(){
+  let base = records;
+  if(activeTab === 'pending_return') base = records.filter(r=>r.dispatch_type==='repair_out' && !['received','closed'].includes(r.status));
+  else if(activeTab !== 'all') base = records.filter(r=>r.dispatch_type===activeTab);
+
+  const q = (document.getElementById('searchBox')?.value || '').trim().toLowerCase();
+  if(!q) return base;
+  return base.filter(r =>
+    (r.item_name||'').toLowerCase().includes(q) ||
+    (r.customer_name||'').toLowerCase().includes(q) ||
+    (r.sent_to||'').toLowerCase().includes(q) ||
+    (r.remarks||'').toLowerCase().includes(q)
+  );
+}
+
+function statusLabel(s){
+  return ({
+    added:'Added',dispatched:'Dispatched',in_repair:'In Repair',received:'Received',delivered:'Delivered',closed:'Closed',
+    received_from_customer:'Received from Customer', sent_to_vendor:'Sent to Vendor',
+    received_from_vendor:'Received from Vendor', returned_to_customer:'Returned to Customer'
+  })[s] || s;
+}
+
+function typeLabel(t){
+  return ({stock_in:'Stock In', repair_out:'Repair Out', delivery:'Delivery', customer_repair:'Customer Repair'})[t] || t;
+}
+
+function renderTable(){
+  const data = filteredRecords();
+  if(data.length === 0){
+    document.getElementById('tableWrap').innerHTML = `<div class="empty-state">No dispatch records found. Click "+ New Dispatch" to add one.</div>`;
+    return;
+  }
+
+  const rows = data.map(r => {
+    const who = allProfiles[r.dispatched_by]?.full_name || allProfiles[r.dispatched_by]?.email || '—';
+    let secondary = '—', secondaryLabel = 'Details', dateShown = r.dispatch_date || '—';
+    if(r.dispatch_type === 'stock_in'){ secondary = r.sent_to || '—'; secondaryLabel = 'Source'; }
+    else if(r.dispatch_type === 'repair_out'){ secondary = r.sent_to || '—'; secondaryLabel = 'Sent To'; }
+    else if(r.dispatch_type === 'delivery'){ secondary = r.customer_name || '—'; secondaryLabel = 'Customer'; }
+    else if(r.dispatch_type === 'customer_repair'){
+      secondary = `${r.customer_name || '—'} <small style="color:var(--muted)">→ ${r.sent_to || 'vendor?'}</small>`;
+      secondaryLabel = 'Customer → Vendor';
+      dateShown = r.returned_to_customer_date || r.received_from_vendor_date || r.sent_to_vendor_date || r.dispatch_date || '—';
+    }
+    return `
+      <tr>
+        <td data-label="Type"><span class="type-tag ${r.dispatch_type}">${typeLabel(r.dispatch_type)}</span></td>
+        <td data-label="Item">${r.item_name} <small style="color:var(--muted)">×${r.quantity} ${unitLabel(r.unit||'pcs')}</small></td>
+        <td data-label="${secondaryLabel}">${secondary}</td>
+        <td data-label="Dispatch Date">${dateShown}</td>
+        <td data-label="Status"><span class="badge ${r.status}">${statusLabel(r.status)}</span>${r.dispatch_type==='repair_out' && r.received_date ? `<br><small style="color:var(--muted)">In: ${r.received_date}</small>` : ''}</td>
+        <td data-label="By">${who}</td>
+        <td data-label="Actions" class="action-links">
+          <a onclick="openEditModal('${r.id}')">Edit</a>
+          ${r.dispatch_type==='customer_repair' && r.vendor_phone && r.status!=='closed' ? `<a onclick="quickWhatsapp('${r.id}')" style="color:#146c3a">WhatsApp</a>` : ''}
+          ${currentProfile.role==='admin' ? `<a onclick="deleteRecord('${r.id}')" style="color:var(--red)">Delete</a>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Type</th><th>Item</th><th>Source / Sent To / Customer</th><th>Date</th><th>Status</th><th>By</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function quickWhatsapp(id){
+  const r = records.find(x=>x.id===id);
+  if(!r || !r.vendor_phone) return;
+  const phone = r.vendor_phone.replace(/[^0-9]/g,'');
+  const msg = encodeURIComponent(`Namaste ${r.sent_to || ''}, ${r.item_name} ke repair ka status pooch rahe the - kab tak ready hoga? - EVISION India`);
+  window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+}
+
+// ---------- MODAL ----------
+const statusOptionsByType = {
+  stock_in: ['added'],
+  repair_out: ['dispatched','in_repair','received','closed'],
+  delivery: ['dispatched','delivered','closed'],
+  customer_repair: ['received_from_customer','sent_to_vendor','received_from_vendor','returned_to_customer','closed']
+};
+
+function onTypeChange(){
+  const type = document.querySelector('input[name="dtype"]:checked')?.value;
+  document.getElementById('stockInFields').style.display = type === 'stock_in' ? 'block' : 'none';
+  document.getElementById('repairFields').style.display = type === 'repair_out' ? 'block' : 'none';
+  document.getElementById('custRepairFields').style.display = type === 'customer_repair' ? 'block' : 'none';
+  document.getElementById('deliveryFields').style.display = type === 'delivery' ? 'block' : 'none';
+  document.getElementById('genericDateField').style.display = type === 'customer_repair' ? 'none' : 'block';
+  document.getElementById('lblStockIn').classList.toggle('checked', type==='stock_in');
+  document.getElementById('lblRepair').classList.toggle('checked', type==='repair_out');
+  document.getElementById('lblCustRepair').classList.toggle('checked', type==='customer_repair');
+  document.getElementById('lblDelivery').classList.toggle('checked', type==='delivery');
+
+  const statusSel = document.getElementById('f_status');
+  statusSel.innerHTML = (statusOptionsByType[type] || []).map(s=>`<option value="${s}">${statusLabel(s)}</option>`).join('');
+
+  renderWhatsappReminder();
+}
+
+function renderWhatsappReminder(){
+  const type = document.querySelector('input[name="dtype"]:checked')?.value;
+  const wrap = document.getElementById('whatsappReminderWrap');
+  if(type !== 'customer_repair'){ wrap.innerHTML=''; return; }
+  const phone = document.getElementById('cr_vendor_phone').value.trim().replace(/[^0-9]/g,'');
+  const item = document.getElementById('f_item_name').value.trim() || 'item';
+  const vendor = document.getElementById('cr_vendor_name').value.trim() || 'vendor';
+  if(!phone){ wrap.innerHTML = ''; return; }
+  const msg = encodeURIComponent(`Namaste ${vendor}, ${item} ke repair ka status pooch rahe the - kab tak ready hoga? - EVISION India`);
+  wrap.innerHTML = `<a class="btn secondary" style="display:inline-block;margin-bottom:14px;text-decoration:none;" target="_blank" href="https://wa.me/${phone}?text=${msg}">💬 Vendor ko WhatsApp reminder bhejo</a>`;
+}
+
+function openAddModal(){
+  editingId = null;
+  document.getElementById('modalTitle').innerText = 'New Dispatch';
+  document.getElementById('modalMsg').innerHTML = '';
+  document.querySelectorAll('input[name="dtype"]').forEach(r=>r.checked=false);
+  document.getElementById('lblStockIn').classList.remove('checked');
+  document.getElementById('lblRepair').classList.remove('checked');
+  document.getElementById('lblCustRepair').classList.remove('checked');
+  document.getElementById('lblDelivery').classList.remove('checked');
+  document.getElementById('stockInFields').style.display='none';
+  document.getElementById('repairFields').style.display='none';
+  document.getElementById('custRepairFields').style.display='none';
+  document.getElementById('deliveryFields').style.display='none';
+  document.getElementById('cr_customer_name').value='';
+  document.getElementById('cr_received_from_customer').value='';
+  document.getElementById('cr_vendor_name').value='';
+  document.getElementById('cr_vendor_phone').value='';
+  document.getElementById('cr_sent_to_vendor').value='';
+  document.getElementById('cr_received_from_vendor').value='';
+  document.getElementById('cr_returned_to_customer').value='';
+  document.getElementById('whatsappReminderWrap').innerHTML='';
+  document.getElementById('f_item_name').value='';
+  document.getElementById('f_quantity').value=1;
+  document.getElementById('f_unit').value='pcs';
+  document.getElementById('f_source').value='';
+  document.getElementById('f_sent_to').value='';
+  document.getElementById('f_expected_return').value='';
+  document.getElementById('f_received_date').value='';
+  document.getElementById('f_customer_name').value='';
+  document.getElementById('f_address').value='';
+  document.getElementById('f_dispatch_date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f_remarks').value='';
+  document.getElementById('f_status').innerHTML='';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function openEditModal(id){
+  const r = records.find(x=>x.id===id);
+  if(!r) return;
+  editingId = id;
+  document.getElementById('modalTitle').innerText = 'Edit Dispatch';
+  document.getElementById('modalMsg').innerHTML = '';
+
+  document.querySelector(`input[name="dtype"][value="${r.dispatch_type}"]`).checked = true;
+  onTypeChange();
+
+  document.getElementById('f_item_name').value = r.item_name || '';
+  document.getElementById('f_quantity').value = r.quantity || 1;
+  document.getElementById('f_unit').value = r.unit || 'pcs';
+  document.getElementById('f_source').value = r.dispatch_type === 'stock_in' ? (r.sent_to || '') : '';
+  document.getElementById('f_sent_to').value = r.dispatch_type === 'repair_out' ? (r.sent_to || '') : '';
+  document.getElementById('f_expected_return').value = r.expected_return_date || '';
+  document.getElementById('f_received_date').value = r.received_date || '';
+  document.getElementById('f_customer_name').value = r.dispatch_type === 'delivery' ? (r.customer_name || '') : '';
+  document.getElementById('f_address').value = r.address || '';
+  document.getElementById('f_dispatch_date').value = r.dispatch_date || '';
+  document.getElementById('f_remarks').value = r.remarks || '';
+  document.getElementById('f_status').value = r.status;
+
+  document.getElementById('cr_customer_name').value = r.dispatch_type === 'customer_repair' ? (r.customer_name || '') : '';
+  document.getElementById('cr_received_from_customer').value = r.dispatch_type === 'customer_repair' ? (r.dispatch_date || '') : '';
+  document.getElementById('cr_vendor_name').value = r.dispatch_type === 'customer_repair' ? (r.sent_to || '') : '';
+  document.getElementById('cr_vendor_phone').value = r.vendor_phone || '';
+  document.getElementById('cr_sent_to_vendor').value = r.sent_to_vendor_date || '';
+  document.getElementById('cr_received_from_vendor').value = r.received_from_vendor_date || '';
+  document.getElementById('cr_returned_to_customer').value = r.returned_to_customer_date || '';
+  renderWhatsappReminder();
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveRecord(){
+  const type = document.querySelector('input[name="dtype"]:checked')?.value;
+  const item_name = document.getElementById('f_item_name').value.trim();
+  if(!type){ showMsg('modalMsg','Please choose a dispatch type.'); return; }
+  if(!item_name){ showMsg('modalMsg','Please enter item name.'); return; }
+
+  const payload = {
+    dispatch_type: type,
+    item_name,
+    quantity: parseFloat(document.getElementById('f_quantity').value) || 1,
+    unit: document.getElementById('f_unit').value || 'pcs',
+    dispatch_date: type==='customer_repair'
+      ? (document.getElementById('cr_received_from_customer').value || new Date().toISOString().split('T')[0])
+      : (document.getElementById('f_dispatch_date').value || new Date().toISOString().split('T')[0]),
+    status: document.getElementById('f_status').value || (type==='stock_in' ? 'added' : 'dispatched'),
+    remarks: document.getElementById('f_remarks').value.trim(),
+    sent_to: type==='repair_out' ? document.getElementById('f_sent_to').value.trim()
+           : type==='stock_in' ? document.getElementById('f_source').value.trim()
+           : type==='customer_repair' ? document.getElementById('cr_vendor_name').value.trim()
+           : null,
+    expected_return_date: type==='repair_out' ? (document.getElementById('f_expected_return').value || null) : null,
+    received_date: type==='repair_out' ? (document.getElementById('f_received_date').value || null) : null,
+    customer_name: type==='delivery' ? document.getElementById('f_customer_name').value.trim()
+                 : type==='customer_repair' ? document.getElementById('cr_customer_name').value.trim()
+                 : null,
+    address: type==='delivery' ? document.getElementById('f_address').value.trim() : null,
+    vendor_phone: type==='customer_repair' ? document.getElementById('cr_vendor_phone').value.trim() : null,
+    sent_to_vendor_date: type==='customer_repair' ? (document.getElementById('cr_sent_to_vendor').value || null) : null,
+    received_from_vendor_date: type==='customer_repair' ? (document.getElementById('cr_received_from_vendor').value || null) : null,
+    returned_to_customer_date: type==='customer_repair' ? (document.getElementById('cr_returned_to_customer').value || null) : null,
+  };
+
+  if(editingId){
+    const { error } = await sb.from('dispatch_records').update(payload).eq('id', editingId);
+    if(error){ showMsg('modalMsg', error.message); return; }
+  } else {
+    payload.dispatched_by = currentUser.id;
+    const { error } = await sb.from('dispatch_records').insert(payload);
+    if(error){ showMsg('modalMsg', error.message); return; }
+  }
+
+  closeModal();
+  await loadRecords();
+}
+
+async function deleteRecord(id){
+  if(!confirm('Delete this dispatch record?')) return;
+  const { error } = await sb.from('dispatch_records').delete().eq('id', id);
+  if(error){ alert(error.message); return; }
+  await loadRecords();
+}
+
+// ---------- EXPORT ----------
+function toggleExportMenu(){
+  const menu = document.getElementById('exportMenu');
+  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', (e)=>{
+  const menu = document.getElementById('exportMenu');
+  if(menu && !e.target.closest('#exportMenu') && e.target.tagName !== 'BUTTON'){
+    menu.style.display = 'none';
+  }
+});
+
+function exportRows(){
+  return records.map(r => {
+    const who = allProfiles[r.dispatched_by]?.full_name || allProfiles[r.dispatched_by]?.email || '—';
+    let secondary = '—';
+    if(r.dispatch_type === 'stock_in') secondary = r.sent_to || '—';
+    else if(r.dispatch_type === 'repair_out') secondary = r.sent_to || '—';
+    else if(r.dispatch_type === 'delivery') secondary = r.customer_name || '—';
+    else if(r.dispatch_type === 'customer_repair') secondary = `${r.customer_name||''} -> ${r.sent_to||''}`;
+    return {
+      'Type': typeLabel(r.dispatch_type),
+      'Item': r.item_name,
+      'Qty': r.quantity,
+      'Unit': unitLabel(r.unit||'pcs'),
+      'Source / Sent To / Customer': secondary,
+      'Dispatch Date': r.dispatch_date || '',
+      'Expected Return': r.expected_return_date || '',
+      'Received Date': r.received_date || '',
+      'Sent to Vendor': r.sent_to_vendor_date || '',
+      'Received from Vendor': r.received_from_vendor_date || '',
+      'Returned to Customer': r.returned_to_customer_date || '',
+      'Status': statusLabel(r.status),
+      'Dispatched By': who,
+      'Remarks': r.remarks || ''
+    };
+  });
+}
+
+function exportExcel(){
+  toggleExportMenu();
+  if(records.length === 0){ alert('No records to export.'); return; }
+  const ws = XLSX.utils.json_to_sheet(exportRows());
+  ws['!cols'] = [{wch:12},{wch:22},{wch:6},{wch:24},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:26}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dispatch Records');
+
+  // Add stock summary as second sheet
+  const byItem = itemStockMap();
+  const summaryRows = Object.keys(byItem).sort((a,b)=>byItem[a].itemName.localeCompare(byItem[b].itemName)).map(key => ({
+    'Item': byItem[key].itemName, 'Unit': unitLabel(byItem[key].unit),
+    'Stock In': byItem[key].in, 'Stock Out': byItem[key].out, 'Net Stock': byItem[key].in - byItem[key].out
+  }));
+  const ws2 = XLSX.utils.json_to_sheet(summaryRows);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Stock Summary');
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `EVISION-Dispatch-Tracker-${dateStr}.xlsx`);
+}
+
+function exportPDF(){
+  toggleExportMenu();
+  if(records.length === 0){ alert('No records to export.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  doc.setFontSize(16);
+  doc.setTextColor(11,31,58);
+  doc.text('EVISION Dispatch Tracker', 14, 15);
+  doc.setFontSize(10);
+  doc.setTextColor(107,118,134);
+  doc.text(`Exported on ${new Date().toLocaleDateString('en-IN')}`, 14, 21);
+
+  const rows = exportRows();
+  doc.autoTable({
+    startY: 26,
+    head: [Object.keys(rows[0])],
+    body: rows.map(r => Object.values(r)),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [11,31,58] },
+    theme: 'grid'
+  });
+
+  const dateStr = new Date().toISOString().split('T')[0];
+  doc.save(`EVISION-Dispatch-Tracker-${dateStr}.pdf`);
+}
+
+// ---------- INIT ----------
+(async function init(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ await afterLogin(); }
+})();
+</script>
+</body>
+</html>
